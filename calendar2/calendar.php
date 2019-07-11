@@ -362,7 +362,7 @@ $(document).ready(function() {
             $offset = 0;
         }
 
-    }// end of while
+    }// end of while111
 
     if ($offset != 0) {
         SkipOffset((7 - $offset), '', mktime(0, 0, 0, $month + 1, 1, $year));
