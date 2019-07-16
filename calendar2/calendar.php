@@ -37,59 +37,21 @@ $next_year = $year + 1;
 
 
 include_once 'dbconnect.php'; // DB 연결
-include_once 'lun2sol.php';  //양력.음력 변환 인클루드
 
 /****************** lunar_date ************************/
 $predate = date("Y-m-d", mktime(0, 0, 0, $month - 1, 1, $year));
 $nextdate = date("Y-m-d", mktime(0, 0, 0, $month + 1, 1, $year));
 
-$sql = "SELECT solar_date,ganji,lunar_date,yun FROM lunar_data where solar_date between '$predate' and '$nextdate' ";
+$sql = "SELECT holi_date, holi_text FROM holi_data";
 $result = mysqli_query($dbconn, $sql) or die(mysqli_error($dbconn));
 while ($R = mysqli_fetch_array($result)) {
-    $lunarData[] = array(0 => date("n-j", strtotime($R['solar_date'])), 1 => $R['ganji'], 2 => date("n.j", strtotime($R['lunar_date'])), 3 => date("j", strtotime($R['lunar_date'])), 4 => $R['yun']);
+    $holi_data[] = array(0 => date("n-j", strtotime($R['holi_date'])), 1 => $R['holi_text']);
 }
-//echo '<pre>';print_r($lunarData);echo '</pre>';
+
 /****************** lunar_date ************************/
-
-/****************** 기념일 데이터 ************************/
-// 음력 기념일을 생성하면 시작년도부터 해당 양력일자를 자동으로 생성 처리??
-$sql = "SELECT category,subject,memorial_date,dateType FROM memorials";
-$result = mysqli_query($dbconn, $sql);
-while ($R = mysqli_fetch_array($result)) {
-	if($R['dateType'] == 1){ // 음력
-		//$tmp = lun2sol($year . $R['memorial_date']); // 정확도가 맞는지 확인 필요
-		$lunar_temp = $year ."-".substr($R['memorial_date'],0,2)."-".substr($R['memorial_date'],2,2);
-		$rsql = "SELECT solar_date,num,yun,lunar_date FROM lunar_data where lunar_date='".$lunar_temp."'";
-		$rs = mysqli_query($dbconn, $rsql);
-		$RS = mysqli_fetch_array($rs);
-		$tmp = strtotime($RS[0]);
-		if(substr($RS[0],0,4) !== $year){ // 음력 기념일이 같은 해가 아니면
-			$sql = "SELECT count(relatedid) FROM memorial_data where relatedid=".$RS[1]." and solar_date='".$RS[0]."' and yun=".$RS[2]." and subject='".$R['subject']."' ";
-			$rt = mysqli_query($dbconn, $sql);
-// 			$RT = mysqli_fetch_array($rt);
-// 			if($RT[0] == 0){ // 일치하는 데이터가 없으면
-// 				$sql ="INSERT INTO memorial_data (relatedid,solar_date,lunar_date,yun,subject,category) ";
-// 				$sql.="VALUES (".$RS[1].",'".$RS[0]."','".$RS[3]."','".$RS[2]."','".$R['subject']."','".$R['category']."')";
-// 				mysqli_query($dbconn, $sql);
-// 			}
-		}
-	} else { // 양력
-		$tmp = strtotime($year ."-".substr($R['memorial_date'],0,2)."-".substr($R['memorial_date'],2,2));
-	}
-	$memorialData[] = array(0 => date("n-j",$tmp), 1 => $R['category'], 2 => $R['subject']);
-}
-
-// 음력 기념일이 같은 해에 없는 경우 테이블에 생성된 데이터를 조회 및 추가
-$sql = "SELECT solar_date,subject,category FROM memorial_data where solar_date between '$predate' and '$nextdate' ";
-$result = mysqli_query($dbconn, $sql);
-while ($R = mysqli_fetch_array($result)) {
-	$tmp = strtotime($R[0]);
-	$memorialData[] = array(0 => date("n-j",$tmp), 1 => $R['category'], 2 => $R['subject']);
-}
 
 /****************** 휴일 정의 ************************/
 $Holidays = Array();
-$Holidays[] = array(0 => '1-1', 1 => '元日');
 $Holidays[] = array(0 => '1-14', 1 => '成人の日');
 $Holidays[] = array(0 => '2-11', 1 => '建国記念の日');
 $Holidays[] = array(0 => '3-21', 1 => '春分の日');
@@ -112,43 +74,8 @@ $Holidays[] = array(0 => '11-3', 1 => '文化の日');
 $Holidays[] = array(0 => '11-4', 1 => '振替休日');
 $Holidays[] = array(0 => '11-23', 1 => '勤労感謝の日');
 
-//$tmp = lun2sol($year . "0101");  //설날
-$tmp = strtotime(Lun2SolDate($year."-01-01"));
-$Holidays[] = array(0 => date("n-j", ($tmp - (3600 * 24))), 1 => '');
-$Holidays[] = array(0 => date("n-j", $tmp), 1 => '설날');
-$Holidays[] = array(0 => date("n-j", ($tmp + (3600 * 24))), 1 => '');
-
 //$tmp = lun2sol($year . "0408");  //석가탄신일
-$tmp = strtotime(Lun2SolDate($year."-04-08"));
-$Holidays[] = array(0 => date("n-j", $tmp), 1 => '석탄일');
-
-//$tmp = lun2sol($year . "0815"); //추석
-$tmp = strtotime(Lun2SolDate($year."-08-15"));
-$Holidays[] = array(0 => date("n-j", ($tmp - (3600 * 24))), 1 => '');
-$Holidays[] = array(0 => date("n-j", $tmp), 1 => '추석');
-$Holidays[] = array(0 => date("n-j", ($tmp + (3600 * 24))), 1 => '');
-
-// 어린이날 대체공휴일 검사 : 어린이날은 토요일, 일요일인 경우 그 다음 평일을 대체공유일로 지정
-$childdayChk = isWeekend($year."-05-05");
-if($childdayChk == 0) $Holidays[] = array(0 => date("n-j", strtotime($year."-05-06")), 1 => '대체공휴일');
-if($childdayChk == 6) $Holidays[] = array(0 => date("n-j", strtotime($year."-05-07")), 1 => '대체공휴일');
-
-// 설날 대체공휴일 검사
-if(isWeekend(Lun2SolDate($year."-01-01")) == 0)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-01-03"))), 1 => '');
-if(isWeekend(Lun2SolDate($year."-01-01")) == 1)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-01-03"))), 1 => '');
-if(isWeekend(Lun2SolDate($year."-01-02")) == 0)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-01-03"))), 1 => '');
-
-
-// 추석 대체공휴일 검사
-if(isWeekend(Lun2SolDate($year."-08-14")) == 0)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-08-17"))), 1 => '');
-if(isWeekend(Lun2SolDate($year."-08-15")) == 0)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-08-17"))), 1 => '');
-if(isWeekend(Lun2SolDate($year."-08-16")) ==0)
-	$Holidays[] = array(0 => date("n-j", strtotime(Lun2SolDate($year."-08-17"))), 1 => '');
+$Holidays[] = array(0 => $holi_date[$i], 1 => $holi_text[$i]);
 
 /****************** 휴일 정의 ************************/
 
@@ -180,8 +107,6 @@ while ($R = mysqli_fetch_array($result)) {
 	font.holy {font-family: tahoma;font-size: 22px;color: #FF6C21;}
     font.blue {font-family: tahoma;font-size: 22px;color: #0000FF;}
     font.black {font-family: tahoma;font-size: 22px;color: #000000;}
-	font.lunar {font-family: tahoma;font-size: 14px;color: #0000bb;}
-	font.gangi {font-family: tahoma;font-size: 14px;color: #424242;}
 	font.sblue {font-family: tahoma;font-size: 14px;color: blue;	}
 	font.green {font-family: tahoma;font-size: 14px;color: green;	}
 	font.red {font-family: tahoma;font-size: 14px;color: red;}
@@ -290,7 +215,7 @@ $(document).ready(function() {
         if ($offset == 0)
             $style = "holy"; // 일요일 빨간색으로 표기
 		else if($offset == 6)
-			$style = "holy"; // 토요일 빨간색 또는 파란색
+			$style = "blue"; // 토요일 빨간색 또는 파란색
         else
             $style = "black";
 
@@ -304,23 +229,9 @@ $(document).ready(function() {
             }
         }
 
-        // 음력 일자 및 간지 데이터
-// 		for ($i = 0; $i < count($lunarData); $i++) {
-//             if ($lunarData[$i][0] == "$month-$date") {
-// 				if($lunarData[$i][4] == 1){ // 윤달이면
-// 					$lunarday = '(閏)'.$lunarData[$i][2];
-// 				} else {
-// 					$lunarday = $lunarData[$i][2];
-// 				}
-// 				$gaingi_text = $lunarData[$i][1];
-//             }
-//         }
-
-        // 기념일 : 결혼, 생일, 제사, 기타 등
-		for ($i = 0; $i < count($memorialData); $i++) {
-            if ($memorialData[$i][0] == "$month-$date") {
-                $memorialdata = $memorialData[$i][2];
-                break;
+        for ($i = 0; $i < count($holi_data); $i++) {
+            if ($holi_date[$i][0] == "$$month-$date") {
+                $holi_text = $lunarData[$i][1];
             }
         }
 
@@ -336,7 +247,7 @@ $(document).ready(function() {
 		}
 
         if (!$offset == 0) {
-            $R[] = array(0 => $date, 1 => $holy_text, 2 => $dType1, 3 => $dType2, 4 => $dType3, 5 => $dType4);
+            $R[] = array(0 => $date, 1 => $holi_text, 2 => $dType1, 3 => $dType2, 4 => $dType3, 5 => $dType4);
         }
 
         if ($date == $today && $year == $thisyear && $month == $thismonth) { // 오늘 날짜
@@ -344,12 +255,11 @@ $(document).ready(function() {
         } else {
             echo "<td valign=top class='calcell' id='".$year."-".$month."-".$mday."'>";
 		}
-			CalendarPrint($style,$mday,$lunarday,$gaingi_text,$holidata,$memorialdata,$dType1);
+			CalendarPrint($style,$mday,$holidata,$dType1);
 			echo "</td>\n";
 
 		// 출력후 값 초기화
         $holidata = "";
-		$memorialdata ="";
 
         $date++; // 날짜 증가
         $offset++;
@@ -375,12 +285,9 @@ $(document).ready(function() {
 		exit;
 	}
 
-	function CalendarPrint($style,$mday,$lunarday,$gaingi,$holidata='',$memorialdata='',$dType1=''){
+	function CalendarPrint($style,$mday,$holidata='',$dType1=''){
 		echo "<font class=".$style.">$mday</font><br/>";
-		echo "<font class=lunar>$lunarday</font><br/>";
-		echo "<font class=gangi>$gaingi</font><br/>";
 		if(strlen($holidata)>0) echo "<font class=red>$holidata</font><br/>";
-		if(strlen($memorialdata)>0) echo "<font class=sblue>$memorialdata</font><br/>";
 		if(count($dType1)>0) { // 배열 출력
 			for ($i = 0; $i < count($dType1); $i++) {
 				echo "<font class=num uid=".$dType1[$i][1].">".$dType1[$i][0]."</font><br/>";
@@ -402,7 +309,7 @@ $(document).ready(function() {
 
 	function Lun2SolDate($date){
 		global $dbconn;
-		$sql = "SELECT solar_date FROM lunar_data where lunar_date='".$date."'";
+		$sql = "SELECT holi_date FROM holi_data where holi_date='".$date."'";
 		$result = mysqli_query($dbconn, $sql);
 		$R = mysqli_fetch_array($result);
 		return $R[0];
